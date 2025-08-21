@@ -12,7 +12,7 @@ from .downloader import download_grib
 from .parser import parse_grib_file
 from .transformer import transform_to_long_format, combine_forecast_data, validate_dataframe
 from .db import HrrrDatabase
-from .utils import read_points_file, build_s3_url
+from .utils import read_points_file, build_s3_url, validate_variables, map_variables_to_grib_names, get_variable_levels_for_filtering, get_last_available_date, get_allowed_variables
 
 logger = logging.getLogger(__name__)
 
@@ -44,8 +44,14 @@ def parse_arguments() -> argparse.Namespace:
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  hrrr-ingest points.txt --run-date 2025-01-24 --variables temperature_2m --num-hours 2
-  hrrr-ingest locations.csv --run-date 2025-01-24 --variables temperature_2m,surface_pressure --num-hours 6 --db-path forecast.db
+  # Basic usage with auto-detected date and all variables
+  hrrr-ingest points.txt
+
+  # Specify variables and fewer hours for testing
+  hrrr-ingest points.txt --variables temperature_2m,surface_pressure --num-hours 6
+  
+  # Use specific date and custom database
+  hrrr-ingest locations.csv --run-date 2025-01-24 --variables temperature_2m --db-path forecast.db
         """
     )
     
@@ -56,21 +62,19 @@ Examples:
     
     parser.add_argument(
         '--run-date',
-        required=True,
-        help='Run date in YYYY-MM-DD format'
+        help='The forecast run date of the data to ingest. Defaults to the last available date with complete data. Format: YYYY-MM-DD'
     )
     
     parser.add_argument(
         '--variables',
-        required=True,
-        help='Comma-separated list of variables to extract'
+        help='A comma separated list of variables to ingest. The variables should be passed using the human-readable names. Defaults to all supported variables. Allowed variables: surface_pressure, surface_roughness, visible_beam_downward_solar_flux, visible_diffuse_downward_solar_flux, temperature_2m, dewpoint_2m, relative_humidity_2m, u_component_wind_10m, v_component_wind_10m, u_component_wind_80m, v_component_wind_80m'
     )
     
     parser.add_argument(
         '--num-hours',
         type=int,
-        default=1,
-        help='Number of forecast hours to process (default: 1)'
+        default=48,
+        help='Number of hours of forecast data to ingest. Defaults to 48. This will be useful for testing so that you can work with smaller amounts of data.'
     )
     
     parser.add_argument(
@@ -135,20 +139,26 @@ def validate_arguments(args: argparse.Namespace) -> None:
     if not Path(args.points_file).exists():
         raise ValueError(f"Points file not found: {args.points_file}")
     
-    # Validate run date format
-    try:
-        from .utils import parse_run_date
-        parse_run_date(args.run_date)
-    except ValueError as e:
-        raise ValueError(f"Invalid run date: {e}")
+    # Validate run date format if provided
+    if args.run_date:
+        try:
+            from .utils import parse_run_date
+            parse_run_date(args.run_date)
+        except ValueError as e:
+            raise ValueError(f"Invalid run date: {e}")
     
     # Validate num_hours
     if args.num_hours < 1 or args.num_hours > 48:
         raise ValueError("num_hours must be between 1 and 48")
     
-    # Validate variables
-    if not args.variables.strip():
-        raise ValueError("Variables cannot be empty")
+    # Validate variables if provided
+    if args.variables:
+        if not args.variables.strip():
+            raise ValueError("Variables cannot be empty")
+        
+        # Parse and validate variable names
+        variable_list = [var.strip() for var in args.variables.split(',')]
+        validate_variables(variable_list)
 
 def process_forecast_hour(
     run_date: str,
@@ -209,18 +219,38 @@ def main():
         
         logger.info("Starting HRRR ingest process")
         
-        # Parse variables list
-        variables = [v.strip() for v in args.variables.split(',')]
-        logger.info(f"Processing variables: {variables}")
+        # Set default values for optional arguments
+        if not args.run_date:
+            args.run_date = get_last_available_date(args.base_path)
+            logger.info(f"Using auto-detected run date: {args.run_date}")
         
-        # Parse optional filters
+        if not args.variables:
+            # Use all supported variables
+            all_variables = list(get_allowed_variables())
+            args.variables = ','.join(all_variables)
+            logger.info(f"Using all supported variables: {len(all_variables)} variables")
+        
+        # Parse and map variables to grib names
+        variables = [v.strip() for v in args.variables.split(',')]
+        grib_variables = map_variables_to_grib_names(variables)
+        logger.info(f"Processing variables: {variables}")
+        logger.info(f"Mapped to grib names: {grib_variables}")
+        
+        # Get level configurations for variables
+        var_level_types, var_levels = get_variable_levels_for_filtering(variables)
+        
+        # Parse optional filters (user-provided filters take precedence)
         level_types = None
         if args.level_types:
             level_types = [lt.strip() for lt in args.level_types.split(',')]
+        elif var_level_types:
+            level_types = var_level_types
         
         levels = None
         if args.levels:
             levels = [int(l.strip()) for l in args.levels.split(',')]
+        elif var_levels:
+            levels = var_levels
         
         # Read points file
         points = read_points_file(args.points_file)
@@ -240,7 +270,7 @@ def main():
                         args.run_date,
                         hour,
                         points,
-                        variables,
+                        grib_variables,
                         args.cache_dir,
                         args.base_path,
                         level_types,

@@ -56,7 +56,13 @@ def download_grib(
         return str(local_path)
     
     # Convert S3 URL to HTTP URL for requests
-    http_url = s3_url.replace("s3://", "https://")
+    if s3_url.startswith("s3://"):
+        http_url = s3_url.replace("s3://", "https://")
+        # Add .s3.amazonaws.com to the hostname
+        if "noaa-hrrr-bdp-pds" in http_url:
+            http_url = http_url.replace("noaa-hrrr-bdp-pds", "noaa-hrrr-bdp-pds.s3.amazonaws.com")
+    else:
+        http_url = s3_url
     
     logger.info(f"Downloading {http_url} to {local_path}")
     

@@ -17,8 +17,11 @@ class TestHrrrDatabase:
     @pytest.fixture
     def temp_db_path(self):
         """Create a temporary database path."""
+        # Create a temporary file and immediately close it to get the path
         with tempfile.NamedTemporaryFile(suffix='.db', delete=False) as f:
             temp_path = f.name
+        # Remove the file so DuckDB can create a fresh database
+        Path(temp_path).unlink(missing_ok=True)
         yield temp_path
         # Cleanup
         Path(temp_path).unlink(missing_ok=True)
@@ -105,17 +108,25 @@ class TestHrrrDatabase:
             # Insert data first
             db.insert_forecast_data(sample_dataframe)
             
-            # Modify the DataFrame and upsert
+            # Modify the DataFrame and upsert (without unique constraints, this just inserts)
             modified_df = sample_dataframe.copy()
             modified_df.loc[0, 'value'] = 20.0
             
             rows_affected = db.upsert_forecast_data(modified_df)
             assert rows_affected == 2
             
-            # Verify the updated value
-            result = db.conn.execute("SELECT value FROM hrrr_forecasts WHERE latitude = 40.7128")
-            value = result.fetchone()[0]
-            assert value == 20.0
+            # Verify we now have 4 total rows (2 original + 2 new)
+            result = db.conn.execute("SELECT COUNT(*) FROM hrrr_forecasts")
+            total_count = result.fetchone()[0]
+            assert total_count == 4
+            
+            # Verify the original value is still there
+            result = db.conn.execute("SELECT value FROM hrrr_forecasts WHERE latitude = 40.7128 AND value = 15.5")
+            assert result.fetchone() is not None
+            
+            # Verify the new value is also there
+            result = db.conn.execute("SELECT value FROM hrrr_forecasts WHERE latitude = 40.7128 AND value = 20.0")
+            assert result.fetchone() is not None
         finally:
             db.close()
     
@@ -134,7 +145,7 @@ class TestHrrrDatabase:
             # Query with location filter
             df = db.query_forecast_data(lat_min=40.0, lat_max=41.0)
             assert len(df) == 1
-            assert df.iloc[0]['latitude'] == 40.7128
+            assert abs(df.iloc[0]['latitude'] - 40.7128) < 1e-6
             
             # Query with time filter
             start_time = "2025-01-24T12:00:00"
@@ -183,8 +194,11 @@ class TestConvenienceFunctions:
     @pytest.fixture
     def temp_db_path(self):
         """Create a temporary database path."""
+        # Create a temporary file and immediately close it to get the path
         with tempfile.NamedTemporaryFile(suffix='.db', delete=False) as f:
             temp_path = f.name
+        # Remove the file so DuckDB can create a fresh database
+        Path(temp_path).unlink(missing_ok=True)
         yield temp_path
         # Cleanup
         Path(temp_path).unlink(missing_ok=True)

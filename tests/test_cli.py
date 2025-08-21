@@ -32,7 +32,7 @@ class TestParseArguments:
             assert args.points_file == 'points.txt'
             assert args.run_date == '2025-01-24'
             assert args.variables == 'temperature_2m'
-            assert args.num_hours == 1  # default
+            assert args.num_hours == 48  # default
             assert args.db_path == 'data.db'  # default
             assert args.cache_dir == './cache'  # default
             assert args.upsert is False  # default
@@ -141,7 +141,7 @@ class TestValidateArguments:
             Path(temp_file).unlink()
     
     def test_validate_empty_variables(self):
-        """Test validation with empty variables."""
+        """Test validation with empty variables when explicitly provided."""
         with tempfile.NamedTemporaryFile(mode='w', delete=False) as f:
             f.write("40.7128,-74.0060\n")
             temp_file = f.name
@@ -151,10 +151,28 @@ class TestValidateArguments:
             args.points_file = temp_file
             args.run_date = "2025-01-24"
             args.num_hours = 1
-            args.variables = ""  # Empty
+            args.variables = "   "  # Only whitespace, should raise error
             
             with pytest.raises(ValueError, match="Variables cannot be empty"):
                 validate_arguments(args)
+        finally:
+            Path(temp_file).unlink()
+    
+    def test_validate_none_variables(self):
+        """Test validation with None variables (should pass)."""
+        with tempfile.NamedTemporaryFile(mode='w', delete=False) as f:
+            f.write("40.7128,-74.0060\n")
+            temp_file = f.name
+        
+        try:
+            args = MagicMock()
+            args.points_file = temp_file
+            args.run_date = "2025-01-24"
+            args.num_hours = 1
+            args.variables = None  # None should pass
+            
+            # Should not raise any exception
+            validate_arguments(args)
         finally:
             Path(temp_file).unlink()
 

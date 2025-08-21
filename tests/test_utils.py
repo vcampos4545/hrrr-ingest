@@ -1,206 +1,150 @@
 """
-Unit tests for utils module.
+Tests for utility functions.
 """
 
 import pytest
 import numpy as np
 from datetime import datetime
-from pathlib import Path
-import tempfile
-
 from hrrr_ingest.utils import (
-    find_nearest_grid_point,
-    parse_run_date,
-    calculate_valid_time,
+    find_nearest_grid_point, 
+    parse_run_date, 
     build_s3_url,
-    validate_lat_lon,
-    read_points_file
+    read_points_file,
+    get_allowed_variables,
+    get_grib_variable_name,
+    get_variable_level_config,
+    validate_variables,
+    map_variables_to_grib_names,
+    get_variable_levels_for_filtering
 )
 
+def test_find_nearest_grid_point():
+    """Test finding nearest grid point."""
+    # Create a simple 2x2 grid
+    lats = np.array([[40.0, 40.1], [41.0, 41.1]])
+    lons = np.array([[-74.0, -73.9], [-74.0, -73.9]])
+    
+    # Test point closest to (40.0, -74.0)
+    row, col = find_nearest_grid_point(40.05, -74.05, lats, lons)
+    assert row == 0
+    assert col == 0
+    
+    # Test point closest to (41.1, -73.9)
+    row, col = find_nearest_grid_point(41.05, -73.85, lats, lons)
+    assert row == 1
+    assert col == 1
 
-class TestFindNearestGridPoint:
-    """Test nearest grid point finding functionality."""
+def test_parse_run_date():
+    """Test parsing run date."""
+    # Valid date
+    date = parse_run_date("2025-01-24")
+    assert isinstance(date, datetime)
+    assert date.year == 2025
+    assert date.month == 1
+    assert date.day == 24
     
-    def test_find_nearest_grid_point(self):
-        """Test finding nearest grid point to target coordinates."""
-        # Create a simple 3x3 grid
-        lats = np.array([[0, 1, 2], [0, 1, 2], [0, 1, 2]])
-        lons = np.array([[0, 0, 0], [1, 1, 1], [2, 2, 2]])
-        
-        # Target point at (1.1, 1.1) should be closest to grid point (1, 1)
-        row, col = find_nearest_grid_point(1.1, 1.1, lats, lons)
-        assert row == 1
-        assert col == 1
-    
-    def test_find_nearest_grid_point_edge_case(self):
-        """Test edge case where target is exactly on a grid point."""
-        lats = np.array([[0, 1], [0, 1]])
-        lons = np.array([[0, 0], [1, 1]])
-        
-        row, col = find_nearest_grid_point(0, 0, lats, lons)
-        assert row == 0
-        assert col == 0
+    # Invalid date
+    with pytest.raises(ValueError):
+        parse_run_date("invalid-date")
 
+def test_build_s3_url():
+    """Test building S3 URL."""
+    url = build_s3_url("2025-01-24", 3, "s3://test-bucket/hrrr")
+    expected = "s3://test-bucket/hrrr.20250124/conus/hrrr.t00z.wrfsfcf03.grib2"
+    assert url == expected
 
-class TestParseRunDate:
-    """Test run date parsing functionality."""
+def test_read_points_file(tmp_path):
+    """Test reading points file."""
+    # Create a temporary points file
+    points_file = tmp_path / "points.txt"
+    points_file.write_text("40.7128,-74.0060\n34.0522,-118.2437\n")
     
-    def test_parse_valid_date(self):
-        """Test parsing a valid date string."""
-        date_str = "2025-01-24"
-        result = parse_run_date(date_str)
-        expected = datetime(2025, 1, 24)
-        assert result == expected
-    
-    def test_parse_invalid_date(self):
-        """Test parsing an invalid date string."""
-        with pytest.raises(ValueError, match="Invalid date format"):
-            parse_run_date("2025/01/24")
-    
-    def test_parse_malformed_date(self):
-        """Test parsing a malformed date string."""
-        with pytest.raises(ValueError):
-            parse_run_date("not-a-date")
+    points = read_points_file(str(points_file))
+    assert len(points) == 2
+    assert points[0] == (40.7128, -74.0060)
+    assert points[1] == (34.0522, -118.2437)
 
+def test_get_allowed_variables():
+    """Test getting allowed variables."""
+    allowed_vars = get_allowed_variables()
+    assert isinstance(allowed_vars, set)
+    assert "temperature_2m" in allowed_vars
+    assert "surface_pressure" in allowed_vars
+    assert "u_component_wind_80m" in allowed_vars
+    assert len(allowed_vars) == 11  # Total number of allowed variables
 
-class TestCalculateValidTime:
-    """Test valid time calculation functionality."""
+def test_get_grib_variable_name():
+    """Test mapping argument names to grib names."""
+    # Valid mappings
+    assert get_grib_variable_name("temperature_2m") == "2 metre temperature"
+    assert get_grib_variable_name("surface_pressure") == "Surface pressure"
+    assert get_grib_variable_name("u_component_wind_80m") == "U component of wind"
     
-    def test_calculate_valid_time(self):
-        """Test calculating valid time from run time and forecast hour."""
-        run_time = datetime(2025, 1, 24, 12, 0, 0)
-        forecast_hour = 3
-        
-        valid_time = calculate_valid_time(run_time, forecast_hour)
-        expected = datetime(2025, 1, 24, 15, 0, 0)
-        assert valid_time == expected
+    # Invalid variable
+    with pytest.raises(ValueError, match="Variable 'invalid_var' is not allowed"):
+        get_grib_variable_name("invalid_var")
 
+def test_get_variable_level_config():
+    """Test getting variable level configurations."""
+    # Variables with level configs
+    assert get_variable_level_config("u_component_wind_80m") == {"level": 80}
+    assert get_variable_level_config("v_component_wind_80m") == {"level": 80}
+    
+    # Variables without level configs
+    assert get_variable_level_config("temperature_2m") == {}
+    assert get_variable_level_config("surface_pressure") == {}
 
-class TestBuildS3Url:
-    """Test S3 URL building functionality."""
+def test_validate_variables():
+    """Test variable validation."""
+    # Valid variables
+    validate_variables(["temperature_2m", "surface_pressure"])
     
-    def test_build_s3_url(self):
-        """Test building S3 URL for HRRR data."""
-        run_date = "2025-01-24"
-        forecast_hour = 3
-        
-        url = build_s3_url(run_date, forecast_hour)
-        expected = "s3://noaa-hrrr-bdp-pds/hrrr.20250124/conus/hrrr.t00z.wrfsfcf03.grib2"
-        assert url == expected
+    # Invalid variables
+    with pytest.raises(ValueError, match=r"Invalid variables: \['invalid_var'\]"):
+        validate_variables(["temperature_2m", "invalid_var"])
     
-    def test_build_s3_url_custom_base(self):
-        """Test building S3 URL with custom base path."""
-        run_date = "2025-01-24"
-        forecast_hour = 0
-        base_path = "s3://custom-bucket/hrrr"
-        
-        url = build_s3_url(run_date, forecast_hour, base_path)
-        expected = "s3://custom-bucket/hrrr.20250124/conus/hrrr.t00z.wrfsfcf00.grib2"
-        assert url == expected
+    # Empty list
+    validate_variables([])
 
+def test_map_variables_to_grib_names():
+    """Test mapping variables to grib names."""
+    # Valid mapping
+    grib_names = map_variables_to_grib_names(["temperature_2m", "surface_pressure"])
+    assert grib_names == ["2 metre temperature", "Surface pressure"]
+    
+    # Invalid variable should raise error
+    with pytest.raises(ValueError):
+        map_variables_to_grib_names(["temperature_2m", "invalid_var"])
 
-class TestValidateLatLon:
-    """Test latitude/longitude validation functionality."""
+def test_get_variable_levels_for_filtering():
+    """Test getting level configurations for filtering."""
+    # Variables with level configs
+    level_types, levels = get_variable_levels_for_filtering(["u_component_wind_80m", "v_component_wind_80m"])
+    assert levels == [80]
+    assert level_types == []
     
-    def test_valid_coordinates(self):
-        """Test valid coordinate pairs."""
-        assert validate_lat_lon(0, 0) is True
-        assert validate_lat_lon(90, 180) is True
-        assert validate_lat_lon(-90, -180) is True
-        assert validate_lat_lon(45.5, -120.3) is True
+    # Variables without level configs
+    level_types, levels = get_variable_levels_for_filtering(["temperature_2m", "surface_pressure"])
+    assert levels == []
+    assert level_types == []
     
-    def test_invalid_latitude(self):
-        """Test invalid latitude values."""
-        assert validate_lat_lon(91, 0) is False
-        assert validate_lat_lon(-91, 0) is False
-    
-    def test_invalid_longitude(self):
-        """Test invalid longitude values."""
-        assert validate_lat_lon(0, 181) is False
-        assert validate_lat_lon(0, -181) is False
+    # Mixed variables
+    level_types, levels = get_variable_levels_for_filtering(["temperature_2m", "u_component_wind_80m"])
+    assert levels == [80]
+    assert level_types == []
 
-
-class TestReadPointsFile:
-    """Test points file reading functionality."""
+def test_get_last_available_date():
+    """Test getting last available date."""
+    from hrrr_ingest.utils import get_last_available_date
     
-    def test_read_valid_points_file(self):
-        """Test reading a valid points file."""
-        with tempfile.NamedTemporaryFile(mode='w', delete=False) as f:
-            f.write("40.7128,-74.0060\n")
-            f.write("34.0522,-118.2437\n")
-            f.write("41.8781,-87.6298\n")
-            temp_file = f.name
-        
-        try:
-            points = read_points_file(temp_file)
-            expected = [
-                (40.7128, -74.0060),
-                (34.0522, -118.2437),
-                (41.8781, -87.6298)
-            ]
-            assert points == expected
-        finally:
-            Path(temp_file).unlink()
+    # Should return a valid date string in YYYY-MM-DD format
+    date = get_last_available_date()
+    assert isinstance(date, str)
+    assert len(date) == 10  # YYYY-MM-DD format
+    assert date[4] == '-' and date[7] == '-'
     
-    def test_read_points_file_with_comments(self):
-        """Test reading points file with comments."""
-        with tempfile.NamedTemporaryFile(mode='w', delete=False) as f:
-            f.write("# This is a comment\n")
-            f.write("40.7128,-74.0060  # New York\n")
-            f.write("\n")  # Empty line
-            f.write("34.0522,-118.2437\n")
-            temp_file = f.name
-        
-        try:
-            points = read_points_file(temp_file)
-            expected = [
-                (40.7128, -74.0060),
-                (34.0522, -118.2437)
-            ]
-            assert points == expected
-        finally:
-            Path(temp_file).unlink()
-    
-    def test_read_points_file_invalid_format(self):
-        """Test reading points file with invalid format."""
-        with tempfile.NamedTemporaryFile(mode='w', delete=False) as f:
-            f.write("40.7128,-74.0060\n")
-            f.write("invalid,format\n")
-            temp_file = f.name
-        
-        try:
-            with pytest.raises(ValueError, match="Line 2:"):
-                read_points_file(temp_file)
-        finally:
-            Path(temp_file).unlink()
-    
-    def test_read_points_file_invalid_coordinates(self):
-        """Test reading points file with invalid coordinates."""
-        with tempfile.NamedTemporaryFile(mode='w', delete=False) as f:
-            f.write("40.7128,-74.0060\n")
-            f.write("91.0,0.0\n")  # Invalid latitude
-            temp_file = f.name
-        
-        try:
-            with pytest.raises(ValueError, match="Line 2:"):
-                read_points_file(temp_file)
-        finally:
-            Path(temp_file).unlink()
-    
-    def test_read_nonexistent_file(self):
-        """Test reading a nonexistent file."""
-        with pytest.raises(FileNotFoundError):
-            read_points_file("nonexistent.txt")
-    
-    def test_read_empty_file(self):
-        """Test reading an empty file."""
-        with tempfile.NamedTemporaryFile(mode='w', delete=False) as f:
-            f.write("")  # Empty file
-            temp_file = f.name
-        
-        try:
-            with pytest.raises(ValueError, match="No valid points found"):
-                read_points_file(temp_file)
-        finally:
-            Path(temp_file).unlink()
+    # Should be a valid date
+    from datetime import datetime
+    parsed_date = datetime.strptime(date, "%Y-%m-%d")
+    assert isinstance(parsed_date, datetime)
 

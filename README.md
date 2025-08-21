@@ -37,7 +37,15 @@ pip install -r requirements.txt
 ### Basic Usage
 
 ```bash
-# Download temperature data for 2 forecast hours
+# Basic usage with automatic date detection and all variables (48 hours by default)
+hrrr-ingest points.txt
+
+# Specify variables for testing with fewer hours
+hrrr-ingest points.txt \
+  --variables temperature_2m,surface_pressure \
+  --num-hours 6
+
+# Use specific date
 hrrr-ingest points.txt \
   --run-date 2025-01-24 \
   --variables temperature_2m \
@@ -76,9 +84,9 @@ Create a text file with one lat,lon coordinate pair per line:
 | Option          | Description                                             | Default                     |
 | --------------- | ------------------------------------------------------- | --------------------------- |
 | `points_file`   | Path to file containing lat,lon coordinates             | Required                    |
-| `--run-date`    | Run date in YYYY-MM-DD format                           | Required                    |
-| `--variables`   | Comma-separated list of variables to extract            | Required                    |
-| `--num-hours`   | Number of forecast hours to process                     | 1                           |
+| `--run-date`    | The forecast run date of the data to ingest             | Last available date         |
+| `--variables`   | A comma separated list of variables to ingest           | All supported variables     |
+| `--num-hours`   | Number of hours of forecast data to ingest              | 48                          |
 | `--db-path`     | Path to DuckDB database file                            | data.db                     |
 | `--cache-dir`   | Directory to cache downloaded files                     | ./cache                     |
 | `--base-path`   | Base S3 path for HRRR data                              | s3://noaa-hrrr-bdp-pds/hrrr |
@@ -104,14 +112,23 @@ The tool creates a `hrrr_forecasts` table with the following schema:
 
 ## Available Variables
 
-Common HRRR variables include:
+The tool supports the following variables that can be passed as arguments:
 
-- `temperature_2m` - 2-meter temperature
-- `surface_pressure` - Surface pressure
-- `wind_speed_10m` - 10-meter wind speed
-- `wind_direction_10m` - 10-meter wind direction
-- `relative_humidity_2m` - 2-meter relative humidity
-- `wind_speed_80m` - 80-meter wind speed (for wind energy)
+| Argument Name                         | GRIB Variable Name                  | Description                              |
+| ------------------------------------- | ----------------------------------- | ---------------------------------------- |
+| `surface_pressure`                    | Surface pressure                    | Surface pressure                         |
+| `surface_roughness`                   | Surface roughness                   | Surface roughness                        |
+| `visible_beam_downward_solar_flux`    | Visible beam downward solar flux    | Visible beam downward solar flux         |
+| `visible_diffuse_downward_solar_flux` | Visible diffuse downward solar flux | Visible diffuse downward solar flux      |
+| `temperature_2m`                      | 2 metre temperature                 | Temperature at 2m above ground           |
+| `dewpoint_2m`                         | 2 metre dewpoint temperature        | Dew point temperature at 2m above ground |
+| `relative_humidity_2m`                | 2 metre relative humidity           | Relative humidity at 2m above ground     |
+| `u_component_wind_10m`                | 10 metre U wind component           | U-Component of wind at 10m above ground  |
+| `v_component_wind_10m`                | 10 metre V wind component           | V-Component of wind at 10m above ground  |
+| `u_component_wind_80m`                | U component of wind                 | U-Component of wind at 80m above ground  |
+| `v_component_wind_80m`                | V component of wind                 | V-Component of wind at 80m above ground  |
+
+**Note:** Variables with specific levels (like 80m wind components) are automatically filtered to the correct level. You can override this by providing explicit `--level-types` and `--levels` arguments.
 
 Use the `--verbose` flag to see all available variables in a GRIB file.
 
@@ -223,4 +240,3 @@ For issues and questions:
 1. Check the [documentation](https://github.com/your-org/hrrr-ingest/blob/main/README.md)
 2. Search [existing issues](https://github.com/your-org/hrrr-ingest/issues)
 3. Create a [new issue](https://github.com/your-org/hrrr-ingest/issues/new)
-

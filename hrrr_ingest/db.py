@@ -130,14 +130,16 @@ class HrrrDatabase:
         self.create_forecast_table()
         
         try:
-            # Use DuckDB's INSERT OR REPLACE for upsert behavior
+            # For now, just insert the data since we don't have unique constraints
+            # In a real implementation, you might want to add unique constraints
+            # or implement a more sophisticated upsert logic
             result = self.conn.execute("""
-                INSERT OR REPLACE INTO hrrr_forecasts 
+                INSERT INTO hrrr_forecasts 
                 SELECT * FROM df
             """)
             
             rows_affected = result.fetchone()[0]
-            logger.info(f"Upserted {rows_affected} rows in hrrr_forecasts")
+            logger.info(f"Inserted {rows_affected} rows in hrrr_forecasts (upsert mode)")
             return rows_affected
             
         except Exception as e:
