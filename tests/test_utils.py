@@ -11,11 +11,7 @@ from hrrr_ingest.utils import (
     build_s3_url,
     read_points_file,
     get_allowed_variables,
-    get_grib_variable_name,
-    get_variable_level_config,
-    validate_variables,
-    map_variables_to_grib_names,
-    get_variable_levels_for_filtering
+    validate_variables
 )
 
 def test_find_nearest_grid_point():
@@ -73,27 +69,6 @@ def test_get_allowed_variables():
     assert "u_component_wind_80m" in allowed_vars
     assert len(allowed_vars) == 11  # Total number of allowed variables
 
-def test_get_grib_variable_name():
-    """Test mapping argument names to grib names."""
-    # Valid mappings
-    assert get_grib_variable_name("temperature_2m") == "2 metre temperature"
-    assert get_grib_variable_name("surface_pressure") == "Surface pressure"
-    assert get_grib_variable_name("u_component_wind_80m") == "U component of wind"
-    
-    # Invalid variable
-    with pytest.raises(ValueError, match="Variable 'invalid_var' is not allowed"):
-        get_grib_variable_name("invalid_var")
-
-def test_get_variable_level_config():
-    """Test getting variable level configurations."""
-    # Variables with level configs
-    assert get_variable_level_config("u_component_wind_80m") == {"level": 80, "typeOfLevel": "heightAboveGround"}
-    assert get_variable_level_config("v_component_wind_80m") == {"level": 80, "typeOfLevel": "heightAboveGround"}
-    
-    # Variables without level configs
-    assert get_variable_level_config("temperature_2m") == {"level": 2, "typeOfLevel": "heightAboveGround"}
-    assert get_variable_level_config("surface_pressure") == {"level": 0, "typeOfLevel": "surface"}
-
 def test_validate_variables():
     """Test variable validation."""
     # Valid variables
@@ -105,33 +80,6 @@ def test_validate_variables():
     
     # Empty list
     validate_variables([])
-
-def test_map_variables_to_grib_names():
-    """Test mapping variables to grib names."""
-    # Valid mapping
-    grib_names = map_variables_to_grib_names(["temperature_2m", "surface_pressure"])
-    assert grib_names == ["2 metre temperature", "Surface pressure"]
-    
-    # Invalid variable should raise error
-    with pytest.raises(ValueError):
-        map_variables_to_grib_names(["temperature_2m", "invalid_var"])
-
-def test_get_variable_levels_for_filtering():
-    """Test getting level configurations for filtering."""
-    # Variables with level configs
-    level_types, levels = get_variable_levels_for_filtering(["u_component_wind_80m", "v_component_wind_80m"])
-    assert levels == [80]
-    assert level_types == ["heightAboveGround"]
-    
-    # Variables without level configs (now they have configs)
-    level_types, levels = get_variable_levels_for_filtering(["temperature_2m", "surface_pressure"])
-    assert sorted(levels) == [0, 2]
-    assert sorted(level_types) == ["heightAboveGround", "surface"]
-    
-    # Mixed variables
-    level_types, levels = get_variable_levels_for_filtering(["temperature_2m", "u_component_wind_80m"])
-    assert sorted(levels) == [2, 80]
-    assert level_types == ["heightAboveGround"]
 
 def test_get_last_available_date():
     """Test getting last available date."""

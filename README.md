@@ -64,7 +64,7 @@ hrrr-ingest locations.csv \
   --levels 2,80 \
   --db-path forecast.db \
   --cache-dir ./hrrr_cache \
-  --upsert \
+
   --verbose
 ```
 
@@ -74,27 +74,30 @@ Create a text file with one lat,lon coordinate pair per line:
 
 ```
 # points.txt
-40.7128,-74.0060  # New York City
-34.0522,-118.2437 # Los Angeles
-41.8781,-87.6298  # Chicago
+# New York City
+40.7128,-74.0060
+# Los Angeles
+34.0522,-118.2437
+# Chicago
+41.8781,-87.6298
 ```
 
 ### Command Line Options
 
-| Option          | Description                                             | Default                                      |
-| --------------- | ------------------------------------------------------- | -------------------------------------------- |
-| `points_file`   | Path to file containing lat,lon coordinates             | Required                                     |
-| `--run-date`    | The forecast run date of the data to ingest             | Last available date                          |
-| `--variables`   | A comma separated list of variables to ingest           | All supported variables                      |
-| `--num-hours`   | Number of hours of forecast data to ingest              | 48                                           |
-| `--db-path`     | Path to DuckDB database file                            | data.db                                      |
-| `--cache-dir`   | Directory to cache downloaded files                     | ./cache                                      |
-| `--base-path`   | Base S3 path for HRRR data                              | s3://noaa-hrrr-bdp-pds.s3.amazonaws.com/hrrr |
-| `--level-types` | Comma-separated list of level types to filter by        | None                                         |
-| `--levels`      | Comma-separated list of levels to filter by             | None                                         |
-| `--upsert`      | Use upsert instead of insert for database operations    | False                                        |
-| `--verbose`     | Enable verbose logging                                  | False                                        |
-| `--dry-run`     | Download and parse data but do not insert into database | False                                        |
+| Option          | Description                                      | Default                                      |
+| --------------- | ------------------------------------------------ | -------------------------------------------- |
+| `points_file`   | Path to file containing lat,lon coordinates      | Required                                     |
+| `--run-date`    | The forecast run date of the data to ingest      | Last available date                          |
+| `--variables`   | A comma separated list of variables to ingest    | All supported variables                      |
+| `--num-hours`   | Number of hours of forecast data to ingest       | 48                                           |
+| `--db-path`     | Path to DuckDB database file                     | data.db                                      |
+| `--cache-dir`   | Directory to cache downloaded files              | ./cache                                      |
+| `--base-path`   | Base S3 path for HRRR data                       | s3://noaa-hrrr-bdp-pds.s3.amazonaws.com/hrrr |
+| `--level-types` | Comma-separated list of level types to filter by | None                                         |
+| `--levels`      | Comma-separated list of levels to filter by      | None                                         |
+
+| `--verbose` | Enable verbose logging | False |
+| `--dry-run` | Download and parse data but do not insert into database | False |
 
 ## Database Schema
 

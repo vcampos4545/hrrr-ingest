@@ -35,7 +35,7 @@ class TestParseArguments:
             assert args.num_hours == 48  # default
             assert args.db_path == 'data.db'  # default
             assert args.cache_dir == './cache'  # default
-            assert args.upsert is False  # default
+
             assert args.verbose is False  # default
             assert args.dry_run is False  # default
     
@@ -52,7 +52,7 @@ class TestParseArguments:
             '--base-path', 's3://custom-bucket/hrrr',
             '--level-types', 'surface,heightAboveGround',
             '--levels', '2,80',
-            '--upsert',
+
             '--verbose',
             '--dry-run'
         ]):
@@ -67,7 +67,7 @@ class TestParseArguments:
             assert args.base_path == 's3://custom-bucket/hrrr'
             assert args.level_types == 'surface,heightAboveGround'
             assert args.levels == '2,80'
-            assert args.upsert is True
+
             assert args.verbose is True
             assert args.dry_run is True
 

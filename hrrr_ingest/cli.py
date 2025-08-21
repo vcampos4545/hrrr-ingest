@@ -105,11 +105,7 @@ Examples:
         help='Comma-separated list of levels to filter by'
     )
     
-    parser.add_argument(
-        '--upsert',
-        action='store_true',
-        help='Use upsert instead of insert for database operations'
-    )
+
     
     parser.add_argument(
         '--verbose', '-v',
@@ -277,11 +273,7 @@ def main():
                 
                 if not args.dry_run:
                     # Insert into database
-                    if args.upsert:
-                        total_rows = db.upsert_forecast_data(combined_df)
-                    else:
-                        total_rows = db.insert_forecast_data(combined_df)
-                    
+                    total_rows = db.insert_forecast_data(combined_df)
                     logger.info(f"Successfully processed {total_rows} total rows")
                 else:
                     logger.info(f"Dry run: Would insert {len(combined_df)} rows")

@@ -2,7 +2,6 @@
 Downloader module for HRRR GRIB2 files from S3.
 """
 
-import os
 import requests
 from pathlib import Path
 from typing import Optional
@@ -50,7 +49,7 @@ def download_grib(
     local_filename = f"noaa-hrrr-bdp-pds.s3.amazonaws.com_hrrr.{run_time}_conus_hrrr.t06z.wrfsfcf{forecast_hour:02d}.grib2"
     local_path = cache_path / local_filename
     
-    # Check if file already exists (idempotency)
+    # Check if file already exists
     if local_path.exists():
         logger.info(f"File already exists, skipping download: {local_path}")
         return str(local_path)
@@ -90,46 +89,4 @@ def download_grib(
         if local_path.exists():
             local_path.unlink()
         raise requests.RequestException(f"Failed to download {http_url}: {str(e)}") from e
-
-def get_cached_files(cache_dir: str = "./cache") -> list:
-    """
-    Get list of cached GRIB2 files.
-    
-    Args:
-        cache_dir: Cache directory path
-        
-    Returns:
-        List of cached file paths
-    """
-    cache_path = Path(cache_dir)
-    if not cache_path.exists():
-        return []
-    
-    return [str(f) for f in cache_path.glob("*.grib2")]
-
-def clear_cache(cache_dir: str = "./cache") -> None:
-    """
-    Clear all cached GRIB2 files.
-    
-    Args:
-        cache_dir: Cache directory path
-    """
-    cache_path = Path(cache_dir)
-    if cache_path.exists():
-        for file_path in cache_path.glob("*.grib2"):
-            file_path.unlink()
-        logger.info(f"Cleared cache directory: {cache_dir}")
-
-def get_file_size(file_path: str) -> Optional[int]:
-    """
-    Get file size in bytes.
-    
-    Args:
-        file_path: Path to the file
-        
-    Returns:
-        File size in bytes, or None if file doesn't exist
-    """
-    path = Path(file_path)
-    return path.stat().st_size if path.exists() else None
 

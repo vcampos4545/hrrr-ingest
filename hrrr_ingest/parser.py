@@ -3,13 +3,10 @@ Parser module for extracting data from GRIB2 files using pygrib.
 """
 
 import pygrib
-import numpy as np
-import pandas as pd
 from typing import List, Dict, Tuple, Optional, Any
 import logging
-from datetime import datetime
 
-from .utils import find_nearest_grid_point, calculate_valid_time, parse_run_date
+from .utils import find_nearest_grid_point
 
 logger = logging.getLogger(__name__)
 
@@ -34,125 +31,6 @@ class GribParser:
             logger.info(f"Opened GRIB2 file: {self.grib_file_path}")
         except Exception as e:
             raise RuntimeError(f"Failed to open GRIB2 file {self.grib_file_path}: {str(e)}") from e
-    
-    def get_available_variables(self) -> List[Dict[str, Any]]:
-        """
-        Get list of available variables in the GRIB2 file.
-        
-        Returns:
-            List of variable dictionaries with keys: name, levelType, level
-        """
-        variables = []
-        self.grib.seek(0)
-        
-        for message in self.grib:
-            var_info = {
-                'name': message.name,
-                'levelType': message.typeOfLevel,
-                'level': message.level,
-                'shortName': message.shortName
-            }
-            variables.append(var_info)
-        
-        return variables
-    
-    def find_variable_messages(
-        self, 
-        variable_names: List[str], 
-        level_types: Optional[List[str]] = None,
-        levels: Optional[List[int]] = None
-    ) -> List[int]:
-        """
-        Find message indices for requested variables.
-        
-        Args:
-            variable_names: List of variable names to find
-            level_types: Optional list of level types to filter by
-            levels: Optional list of levels to filter by
-            
-        Returns:
-            List of message indices
-        """
-        message_indices = []
-        self.grib.seek(0)
-        
-        for i, message in enumerate(self.grib):
-            name_match = message.name in variable_names or message.shortName in variable_names
-            
-            level_type_match = True
-            if level_types:
-                level_type_match = message.typeOfLevel in level_types
-            
-            level_match = True
-            if levels:
-                level_match = message.level in levels
-            
-            if name_match and level_type_match and level_match:
-                message_indices.append(i)
-        
-        return message_indices
-    
-    def extract_variable_data(
-        self, 
-        message_index: int, 
-        target_points: List[Tuple[float, float]]
-    ) -> Dict[str, Any]:
-        """
-        Extract variable data for specific lat/lon points.
-        
-        Args:
-            message_index: Index of the GRIB message
-            target_points: List of (lat, lon) tuples
-            
-        Returns:
-            Dictionary containing variable data for each point
-        """
-        self.grib.seek(message_index)
-        message = self.grib.read(1)[0]
-        
-        # Get grid information
-        lats, lons = message.latlons()
-        values = message.values
-        
-        # Get message metadata
-        variable_name = message.name
-        level_type = message.typeOfLevel
-        level = message.level
-        valid_time = message.validDate
-        run_time = message.analDate
-        
-        # Extract data for each target point
-        point_data = []
-        for lat, lon in target_points:
-            # Find nearest grid point
-            row_idx, col_idx = find_nearest_grid_point(lat, lon, lats, lons)
-            
-            # Get value at nearest point
-            value = values[row_idx, col_idx]
-            grid_lat = lats[row_idx, col_idx]
-            grid_lon = lons[row_idx, col_idx]
-            
-            point_data.append({
-                'target_lat': lat,
-                'target_lon': lon,
-                'grid_lat': grid_lat,
-                'grid_lon': grid_lon,
-                'value': value,
-                'variable': variable_name,
-                'level_type': level_type,
-                'level': level,
-                'valid_time': valid_time,
-                'run_time': run_time
-            })
-        
-        return {
-            'variable_name': variable_name,
-            'level_type': level_type,
-            'level': level,
-            'valid_time': valid_time,
-            'run_time': run_time,
-            'point_data': point_data
-        }
     
     def parse_variables_at_points(
         self, 
@@ -199,8 +77,6 @@ class GribParser:
                 valid_time = message.validDate
                 run_time = message.analDate
                 
-
-                
                 # Extract data for each target point
                 point_data = []
                 for lat, lon in target_points:
@@ -218,7 +94,7 @@ class GribParser:
                         'grid_lat': grid_lat,
                         'grid_lon': grid_lon,
                         'value': value,
-                        'variable': argument_name,  # Store the argument name
+                        'variable': argument_name,
                         'level_type': level_type,
                         'level': level,
                         'valid_time': valid_time,
@@ -226,7 +102,7 @@ class GribParser:
                     })
                 
                 var_data = {
-                    'variable_name': argument_name,  # Store the argument name
+                    'variable_name': argument_name,
                     'level_type': level_type,
                     'level': level,
                     'valid_time': valid_time,

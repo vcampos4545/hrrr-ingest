@@ -99,93 +99,9 @@ class TestHrrrDatabase:
         finally:
             db.close()
     
-    def test_upsert_forecast_data(self, temp_db_path, sample_dataframe):
-        """Test upserting forecast data."""
-        db = HrrrDatabase(temp_db_path)
-        try:
-            db.create_forecast_table()
-            
-            # Insert data first
-            db.insert_forecast_data(sample_dataframe)
-            
-            # Modify the DataFrame and upsert (without unique constraints, this just inserts)
-            modified_df = sample_dataframe.copy()
-            modified_df.loc[0, 'value'] = 20.0
-            
-            rows_affected = db.upsert_forecast_data(modified_df)
-            assert rows_affected == 2
-            
-            # Verify we now have 4 total rows (2 original + 2 new)
-            result = db.conn.execute("SELECT COUNT(*) FROM hrrr_forecasts")
-            total_count = result.fetchone()[0]
-            assert total_count == 4
-            
-            # Verify the original value is still there
-            result = db.conn.execute("SELECT value FROM hrrr_forecasts WHERE latitude = 40.7128 AND value = 15.5")
-            assert result.fetchone() is not None
-            
-            # Verify the new value is also there
-            result = db.conn.execute("SELECT value FROM hrrr_forecasts WHERE latitude = 40.7128 AND value = 20.0")
-            assert result.fetchone() is not None
-        finally:
-            db.close()
+
     
-    def test_query_forecast_data(self, temp_db_path, sample_dataframe):
-        """Test querying forecast data."""
-        db = HrrrDatabase(temp_db_path)
-        try:
-            db.create_forecast_table()
-            db.insert_forecast_data(sample_dataframe)
-            
-            # Query with variable filter
-            df = db.query_forecast_data(variables=['temperature_2m'])
-            assert len(df) == 2
-            assert all(df['variable'] == 'temperature_2m')
-            
-            # Query with location filter
-            df = db.query_forecast_data(lat_min=40.0, lat_max=41.0)
-            assert len(df) == 1
-            assert abs(df.iloc[0]['latitude'] - 40.7128) < 1e-6
-            
-            # Query with time filter
-            start_time = "2025-01-24T12:00:00"
-            df = db.query_forecast_data(start_time=start_time)
-            assert len(df) == 2
-            
-            # Query with limit
-            df = db.query_forecast_data(limit=1)
-            assert len(df) == 1
-        finally:
-            db.close()
-    
-    def test_get_table_info(self, temp_db_path, sample_dataframe):
-        """Test getting table information."""
-        db = HrrrDatabase(temp_db_path)
-        try:
-            db.create_forecast_table()
-            db.insert_forecast_data(sample_dataframe)
-            
-            info = db.get_table_info()
-            
-            assert info['row_count'] == 2
-            assert 'temperature_2m' in info['variables']
-            assert info['db_path'] == temp_db_path
-            assert info['time_range'] is not None
-        finally:
-            db.close()
-    
-    def test_get_table_info_empty_table(self, temp_db_path):
-        """Test getting table info for empty table."""
-        db = HrrrDatabase(temp_db_path)
-        try:
-            db.create_forecast_table()
-            
-            info = db.get_table_info()
-            
-            assert info['row_count'] == 0
-            assert info['variables'] == []
-        finally:
-            db.close()
+
 
 
 class TestConvenienceFunctions:

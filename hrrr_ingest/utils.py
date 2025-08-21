@@ -4,7 +4,7 @@ Shared utilities for HRRR ingest operations.
 
 import numpy as np
 from datetime import datetime, timedelta
-from typing import Tuple, List, Optional, Dict, Set, Any
+from typing import Tuple, List, Dict, Set, Any
 import logging
 import requests
 
@@ -49,36 +49,6 @@ def get_allowed_variables() -> Set[str]:
     """
     return set(ALLOWED_VARIABLES.keys())
 
-def get_grib_variable_name(argument_name: str) -> str:
-    """
-    Get the actual grib variable name for a given argument name.
-    
-    Args:
-        argument_name: The variable name passed as an argument
-        
-    Returns:
-        The actual grib variable name
-        
-    Raises:
-        ValueError: If the argument name is not allowed
-    """
-    if argument_name not in ALLOWED_VARIABLES:
-        raise ValueError(f"Variable '{argument_name}' is not allowed. Allowed variables: {list(ALLOWED_VARIABLES.keys())}")
-    
-    return ALLOWED_VARIABLES[argument_name]
-
-def get_variable_level_config(argument_name: str) -> Dict[str, Any]:
-    """
-    Get the level configuration for a variable if it exists.
-    
-    Args:
-        argument_name: The variable name passed as an argument
-        
-    Returns:
-        Dictionary with level configuration or empty dict if no level config
-    """
-    return VARIABLE_LEVELS.get(argument_name, {})
-
 def validate_variables(variables: List[str]) -> None:
     """
     Validate that all provided variables are in the allowed list.
@@ -97,42 +67,6 @@ def validate_variables(variables: List[str]) -> None:
             f"Invalid variables: {invalid_vars}. "
             f"Allowed variables: {list(allowed_vars)}"
         )
-
-def map_variables_to_grib_names(variables: List[str]) -> List[str]:
-    """
-    Map argument variable names to actual grib variable names.
-    
-    Args:
-        variables: List of variable argument names
-        
-    Returns:
-        List of actual grib variable names
-    """
-    validate_variables(variables)
-    return [get_grib_variable_name(var) for var in variables]
-
-def get_variable_levels_for_filtering(variables: List[str]) -> Tuple[List[str], List[int]]:
-    """
-    Get level types and levels for filtering based on variable configurations.
-    
-    Args:
-        variables: List of variable argument names
-        
-    Returns:
-        Tuple of (level_types, levels) for filtering
-    """
-    level_types = set()
-    levels = set()
-    
-    for var in variables:
-        level_config = get_variable_level_config(var)
-        if level_config:
-            if "level" in level_config:
-                levels.add(level_config["level"])
-            if "typeOfLevel" in level_config:
-                level_types.add(level_config["typeOfLevel"])
-    
-    return list(level_types), list(levels)
 
 def build_variable_configs(variables: List[str]) -> Dict[str, Dict[str, Any]]:
     """
@@ -250,19 +184,6 @@ def parse_run_date(run_date: str) -> datetime:
         return datetime.strptime(run_date, "%Y-%m-%d")
     except ValueError as e:
         raise ValueError(f"Invalid date format: {run_date}. Expected YYYY-MM-DD") from e
-
-def calculate_valid_time(run_time: datetime, forecast_hour: int) -> datetime:
-    """
-    Calculate valid time for a given run time and forecast hour.
-    
-    Args:
-        run_time: Run time datetime
-        forecast_hour: Forecast hour (0-48)
-        
-    Returns:
-        Valid time datetime
-    """
-    return run_time + timedelta(hours=forecast_hour)
 
 def build_s3_url(
     run_date: str, 

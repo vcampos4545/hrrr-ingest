@@ -3,7 +3,7 @@ Transformer module for converting GRIB data to long format for database storage.
 """
 
 import pandas as pd
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any
 import logging
 
 logger = logging.getLogger(__name__)
@@ -155,33 +155,4 @@ def validate_dataframe(df: pd.DataFrame) -> bool:
             return False
     
     return True
-
-def add_metadata_columns(
-    df: pd.DataFrame, 
-    run_date: str, 
-    forecast_hour: int
-) -> pd.DataFrame:
-    """
-    Add additional metadata columns to the DataFrame.
-    
-    Args:
-        df: Input DataFrame
-        run_date: Run date string
-        forecast_hour: Forecast hour
-        
-    Returns:
-        DataFrame with additional metadata columns
-    """
-    df_copy = df.copy()
-    
-    # Add forecast hour column
-    df_copy['forecast_hour'] = forecast_hour
-    
-    # Add run date column
-    df_copy['run_date'] = run_date
-    
-    # Add ingestion timestamp
-    df_copy['ingestion_time'] = pd.Timestamp.now()
-    
-    return df_copy
 
