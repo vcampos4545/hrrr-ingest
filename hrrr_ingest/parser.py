@@ -156,39 +156,89 @@ class GribParser:
     
     def parse_variables_at_points(
         self, 
-        variable_names: List[str], 
-        target_points: List[Tuple[float, float]],
-        level_types: Optional[List[str]] = None,
-        levels: Optional[List[int]] = None
+        variable_configs: Dict[str, Dict[str, Any]], 
+        target_points: List[Tuple[float, float]]
     ) -> List[Dict[str, Any]]:
         """
         Parse multiple variables at multiple points.
         
         Args:
-            variable_names: List of variable names to extract
+            variable_configs: Dictionary mapping GRIB variable names to their level configurations
             target_points: List of (lat, lon) tuples
-            level_types: Optional list of level types to filter by
-            levels: Optional list of levels to filter by
             
         Returns:
             List of variable data dictionaries
         """
-        # Find message indices for requested variables
-        message_indices = self.find_variable_messages(variable_names, level_types, levels)
-        
-        if not message_indices:
-            logger.warning(f"No variables found matching: {variable_names}")
-            return []
-        
-        # Extract data for each variable
         results = []
-        for msg_idx in message_indices:
+        
+        for grib_name, config in variable_configs.items():
             try:
-                var_data = self.extract_variable_data(msg_idx, target_points)
+                # Extract level config and argument name
+                level_config = config['level_config']
+                argument_name = config['argument_name']
+                
+                # Build selection arguments - only include level if it exists
+                select_args = {"name": grib_name}
+                select_args.update(level_config)  # Add level config if it exists
+                
+                # Select the variable
+                grb = self.grib.select(**select_args)
+                if not grb:
+                    logger.warning(f"No variable found matching: {grib_name}")
+                    continue
+                
+                message = grb[0]
+                
+                # Get grid information
+                lats, lons = message.latlons()
+                values = message.values
+                
+                # Get message metadata
+                level_type = message.typeOfLevel
+                level = message.level
+                valid_time = message.validDate
+                run_time = message.analDate
+                
+
+                
+                # Extract data for each target point
+                point_data = []
+                for lat, lon in target_points:
+                    # Find nearest grid point
+                    row_idx, col_idx = find_nearest_grid_point(lat, lon, lats, lons)
+                    
+                    # Get value at nearest point
+                    value = values[row_idx, col_idx]
+                    grid_lat = lats[row_idx, col_idx]
+                    grid_lon = lons[row_idx, col_idx]
+                    
+                    point_data.append({
+                        'target_lat': lat,
+                        'target_lon': lon,
+                        'grid_lat': grid_lat,
+                        'grid_lon': grid_lon,
+                        'value': value,
+                        'variable': argument_name,  # Store the argument name
+                        'level_type': level_type,
+                        'level': level,
+                        'valid_time': valid_time,
+                        'run_time': run_time
+                    })
+                
+                var_data = {
+                    'variable_name': argument_name,  # Store the argument name
+                    'level_type': level_type,
+                    'level': level,
+                    'valid_time': valid_time,
+                    'run_time': run_time,
+                    'point_data': point_data
+                }
+                
                 results.append(var_data)
                 logger.info(f"Extracted {var_data['variable_name']} for {len(target_points)} points")
+                
             except Exception as e:
-                logger.error(f"Failed to extract variable at message {msg_idx}: {str(e)}")
+                logger.error(f"Failed to extract variable {grib_name}: {str(e)}")
                 continue
         
         return results
@@ -200,27 +250,23 @@ class GribParser:
 
 def parse_grib_file(
     grib_file_path: str,
-    variable_names: List[str],
-    target_points: List[Tuple[float, float]],
-    level_types: Optional[List[str]] = None,
-    levels: Optional[List[int]] = None
+    variable_configs: Dict[str, Dict[str, Any]],
+    target_points: List[Tuple[float, float]]
 ) -> List[Dict[str, Any]]:
     """
     Convenience function to parse a GRIB2 file.
     
     Args:
         grib_file_path: Path to the GRIB2 file
-        variable_names: List of variable names to extract
+        variable_configs: Dictionary mapping variable names to their level configurations
         target_points: List of (lat, lon) tuples
-        level_types: Optional list of level types to filter by
-        levels: Optional list of levels to filter by
         
     Returns:
         List of variable data dictionaries
     """
     parser = GribParser(grib_file_path)
     try:
-        return parser.parse_variables_at_points(variable_names, target_points, level_types, levels)
+        return parser.parse_variables_at_points(variable_configs, target_points)
     finally:
         parser.close()
 

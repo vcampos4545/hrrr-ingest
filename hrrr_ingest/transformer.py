@@ -36,9 +36,9 @@ def transform_to_long_format(
         run_time = var_data['run_time']
         
         for point_data in var_data['point_data']:
-            # Use target coordinates (requested lat/lon)
-            lat = point_data['target_lat']
-            lon = point_data['target_lon']
+            # Use grid coordinates (actual lat/lon from data)
+            lat = point_data['grid_lat']
+            lon = point_data['grid_lon']
             value = point_data['value']
             
             # Create row for this variable/point combination

@@ -4,7 +4,7 @@ A command-line tool for downloading and processing HRRR (High-Resolution Rapid R
 
 ## Features
 
-- **Download HRRR GRIB2 files** from NOAA's S3 bucket with automatic caching
+- **Download HRRR GRIB2 files** from NOAA's S3 bucket with automatic caching (06z run)
 - **Extract specific variables** at requested lat/lon coordinates using nearest neighbor interpolation
 - **Store data in DuckDB** in a normalized long format for efficient querying
 - **Idempotent operations** - safe to re-run without duplicating data
@@ -81,34 +81,34 @@ Create a text file with one lat,lon coordinate pair per line:
 
 ### Command Line Options
 
-| Option          | Description                                             | Default                     |
-| --------------- | ------------------------------------------------------- | --------------------------- |
-| `points_file`   | Path to file containing lat,lon coordinates             | Required                    |
-| `--run-date`    | The forecast run date of the data to ingest             | Last available date         |
-| `--variables`   | A comma separated list of variables to ingest           | All supported variables     |
-| `--num-hours`   | Number of hours of forecast data to ingest              | 48                          |
-| `--db-path`     | Path to DuckDB database file                            | data.db                     |
-| `--cache-dir`   | Directory to cache downloaded files                     | ./cache                     |
-| `--base-path`   | Base S3 path for HRRR data                              | s3://noaa-hrrr-bdp-pds/hrrr |
-| `--level-types` | Comma-separated list of level types to filter by        | None                        |
-| `--levels`      | Comma-separated list of levels to filter by             | None                        |
-| `--upsert`      | Use upsert instead of insert for database operations    | False                       |
-| `--verbose`     | Enable verbose logging                                  | False                       |
-| `--dry-run`     | Download and parse data but do not insert into database | False                       |
+| Option          | Description                                             | Default                                      |
+| --------------- | ------------------------------------------------------- | -------------------------------------------- |
+| `points_file`   | Path to file containing lat,lon coordinates             | Required                                     |
+| `--run-date`    | The forecast run date of the data to ingest             | Last available date                          |
+| `--variables`   | A comma separated list of variables to ingest           | All supported variables                      |
+| `--num-hours`   | Number of hours of forecast data to ingest              | 48                                           |
+| `--db-path`     | Path to DuckDB database file                            | data.db                                      |
+| `--cache-dir`   | Directory to cache downloaded files                     | ./cache                                      |
+| `--base-path`   | Base S3 path for HRRR data                              | s3://noaa-hrrr-bdp-pds.s3.amazonaws.com/hrrr |
+| `--level-types` | Comma-separated list of level types to filter by        | None                                         |
+| `--levels`      | Comma-separated list of levels to filter by             | None                                         |
+| `--upsert`      | Use upsert instead of insert for database operations    | False                                        |
+| `--verbose`     | Enable verbose logging                                  | False                                        |
+| `--dry-run`     | Download and parse data but do not insert into database | False                                        |
 
 ## Database Schema
 
 The tool creates a `hrrr_forecasts` table with the following schema:
 
-| Column           | Type      | Description                |
-| ---------------- | --------- | -------------------------- |
-| `valid_time_utc` | TIMESTAMP | Valid time of the forecast |
-| `run_time_utc`   | TIMESTAMP | Model run time             |
-| `latitude`       | FLOAT     | Latitude coordinate        |
-| `longitude`      | FLOAT     | Longitude coordinate       |
-| `variable`       | VARCHAR   | Variable name              |
-| `value`          | FLOAT     | Variable value             |
-| `source_s3`      | VARCHAR   | Source S3 URL              |
+| Column           | Type      | Description                                                                              |
+| ---------------- | --------- | ---------------------------------------------------------------------------------------- |
+| `valid_time_utc` | TIMESTAMP | UTC timestamp of when the forecast is valid (e.g., 2025-01-26 18:00:00 for f12 forecast) |
+| `run_time_utc`   | TIMESTAMP | UTC timestamp of when the forecast was made (e.g., 2025-01-26 06:00:00 for 06z run)      |
+| `latitude`       | FLOAT     | Actual grid latitude coordinate from the data                                            |
+| `longitude`      | FLOAT     | Actual grid longitude coordinate from the data                                           |
+| `variable`       | VARCHAR   | Variable name                                                                            |
+| `value`          | FLOAT     | Variable value                                                                           |
+| `source_s3`      | VARCHAR   | Source S3 URL                                                                            |
 
 ## Available Variables
 
@@ -117,9 +117,9 @@ The tool supports the following variables that can be passed as arguments:
 | Argument Name                         | GRIB Variable Name                  | Description                              |
 | ------------------------------------- | ----------------------------------- | ---------------------------------------- |
 | `surface_pressure`                    | Surface pressure                    | Surface pressure                         |
-| `surface_roughness`                   | Surface roughness                   | Surface roughness                        |
-| `visible_beam_downward_solar_flux`    | Visible beam downward solar flux    | Visible beam downward solar flux         |
-| `visible_diffuse_downward_solar_flux` | Visible diffuse downward solar flux | Visible diffuse downward solar flux      |
+| `surface_roughness`                   | Forecast surface roughness          | Surface roughness                        |
+| `visible_beam_downward_solar_flux`    | Visible Beam Downward Solar Flux    | Visible beam downward solar flux         |
+| `visible_diffuse_downward_solar_flux` | Visible Diffuse Downward Solar Flux | Visible diffuse downward solar flux      |
 | `temperature_2m`                      | 2 metre temperature                 | Temperature at 2m above ground           |
 | `dewpoint_2m`                         | 2 metre dewpoint temperature        | Dew point temperature at 2m above ground |
 | `relative_humidity_2m`                | 2 metre relative humidity           | Relative humidity at 2m above ground     |
@@ -131,6 +131,17 @@ The tool supports the following variables that can be passed as arguments:
 **Note:** Variables with specific levels (like 80m wind components) are automatically filtered to the correct level. You can override this by providing explicit `--level-types` and `--levels` arguments.
 
 Use the `--verbose` flag to see all available variables in a GRIB file.
+
+### Cache File Naming
+
+Downloaded GRIB2 files are cached locally with names that closely match the HTTPS URLs they were downloaded from:
+
+```
+cache/noaa-hrrr-bdp-pds.s3.amazonaws.com_hrrr.20250124_conus_hrrr.t06z.wrfsfcf00.grib2
+cache/noaa-hrrr-bdp-pds.s3.amazonaws.com_hrrr.20250124_conus_hrrr.t06z.wrfsfcf12.grib2
+```
+
+This naming convention preserves the URL structure and makes it easy to identify the source of each cached file.
 
 ## Examples
 

@@ -4,7 +4,7 @@ Shared utilities for HRRR ingest operations.
 
 import numpy as np
 from datetime import datetime, timedelta
-from typing import Tuple, List, Optional, Dict, Set
+from typing import Tuple, List, Optional, Dict, Set, Any
 import logging
 import requests
 
@@ -13,9 +13,9 @@ logger = logging.getLogger(__name__)
 # Allowed variables that can be passed as arguments
 ALLOWED_VARIABLES = {
     "surface_pressure": "Surface pressure",
-    "surface_roughness": "Surface roughness", 
-    "visible_beam_downward_solar_flux": "Visible beam downward solar flux",
-    "visible_diffuse_downward_solar_flux": "Visible diffuse downward solar flux",
+    "surface_roughness": "Forecast surface roughness", 
+    "visible_beam_downward_solar_flux": "Visible Beam Downward Solar Flux",
+    "visible_diffuse_downward_solar_flux": "Visible Diffuse Downward Solar Flux",
     "temperature_2m": "2 metre temperature",
     "dewpoint_2m": "2 metre dewpoint temperature",
     "relative_humidity_2m": "2 metre relative humidity",
@@ -27,8 +27,17 @@ ALLOWED_VARIABLES = {
 
 # Variable level configurations for variables that require specific levels
 VARIABLE_LEVELS = {
-    "u_component_wind_80m": {"level": 80},
-    "v_component_wind_80m": {"level": 80}
+    "temperature_2m": {"level": 2, "typeOfLevel": "heightAboveGround"},
+    "dewpoint_2m": {"level": 2, "typeOfLevel": "heightAboveGround"},
+    "relative_humidity_2m": {"level": 2, "typeOfLevel": "heightAboveGround"},
+    "u_component_wind_10m": {"level": 10, "typeOfLevel": "heightAboveGround"},
+    "v_component_wind_10m": {"level": 10, "typeOfLevel": "heightAboveGround"},
+    "u_component_wind_80m": {"level": 80, "typeOfLevel": "heightAboveGround"},
+    "v_component_wind_80m": {"level": 80, "typeOfLevel": "heightAboveGround"},
+    "surface_pressure": {"level": 0, "typeOfLevel": "surface"},
+    "surface_roughness": {"level": 0, "typeOfLevel": "surface"},
+    "visible_beam_downward_solar_flux": {"level": 0, "typeOfLevel": "surface"},
+    "visible_diffuse_downward_solar_flux": {"level": 0, "typeOfLevel": "surface"}
 }
 
 def get_allowed_variables() -> Set[str]:
@@ -58,7 +67,7 @@ def get_grib_variable_name(argument_name: str) -> str:
     
     return ALLOWED_VARIABLES[argument_name]
 
-def get_variable_level_config(argument_name: str) -> Dict[str, any]:
+def get_variable_level_config(argument_name: str) -> Dict[str, Any]:
     """
     Get the level configuration for a variable if it exists.
     
@@ -120,12 +129,35 @@ def get_variable_levels_for_filtering(variables: List[str]) -> Tuple[List[str], 
         if level_config:
             if "level" in level_config:
                 levels.add(level_config["level"])
-            if "level_type" in level_config:
-                level_types.add(level_config["level_type"])
+            if "typeOfLevel" in level_config:
+                level_types.add(level_config["typeOfLevel"])
     
     return list(level_types), list(levels)
 
-def get_last_available_date(base_path: str = "s3://noaa-hrrr-bdp-pds/hrrr") -> str:
+def build_variable_configs(variables: List[str]) -> Dict[str, Dict[str, Any]]:
+    """
+    Build variable configurations for parsing.
+    
+    Args:
+        variables: List of variable argument names
+        
+    Returns:
+        Dictionary mapping GRIB variable names to their configurations (level config + argument name)
+    """
+    configs = {}
+    
+    for var in variables:
+        grib_name = get_grib_variable_name(var)
+        level_config = get_variable_level_config(var)
+        # Store both the level config and the argument name
+        configs[grib_name] = {
+            'level_config': level_config,
+            'argument_name': var
+        }
+    
+    return configs
+
+def get_last_available_date(base_path: str = "s3://noaa-hrrr-bdp-pds.s3.amazonaws.com/hrrr") -> str:
     """
     Find the last available date with complete HRRR data.
     
@@ -153,7 +185,6 @@ def get_last_available_date(base_path: str = "s3://noaa-hrrr-bdp-pds/hrrr") -> s
         # Convert S3 URL to HTTPS URL for checking
         if test_url.startswith("s3://"):
             https_url = test_url.replace("s3://", "https://")
-            https_url = https_url.replace("noaa-hrrr-bdp-pds", "noaa-hrrr-bdp-pds.s3.amazonaws.com")
         else:
             https_url = test_url
             
@@ -236,7 +267,7 @@ def calculate_valid_time(run_time: datetime, forecast_hour: int) -> datetime:
 def build_s3_url(
     run_date: str, 
     forecast_hour: int, 
-    base_path: str = "s3://noaa-hrrr-bdp-pds/hrrr"
+    base_path: str = "s3://noaa-hrrr-bdp-pds.s3.amazonaws.com/hrrr"
 ) -> str:
     """
     Build S3 URL for HRRR GRIB2 file.
@@ -251,7 +282,8 @@ def build_s3_url(
     """
     run_time = parse_run_date(run_date)
     date_str = run_time.strftime("%Y%m%d")
-    hour_str = run_time.strftime("%H")
+    # Use 06z run (hardcoded)
+    hour_str = "06"
     forecast_str = f"f{forecast_hour:02d}"
     
     return f"{base_path}.{date_str}/conus/hrrr.t{hour_str}z.wrfsfc{forecast_str}.grib2"

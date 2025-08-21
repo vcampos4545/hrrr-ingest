@@ -50,7 +50,7 @@ def test_parse_run_date():
 def test_build_s3_url():
     """Test building S3 URL."""
     url = build_s3_url("2025-01-24", 3, "s3://test-bucket/hrrr")
-    expected = "s3://test-bucket/hrrr.20250124/conus/hrrr.t00z.wrfsfcf03.grib2"
+    expected = "s3://test-bucket/hrrr.20250124/conus/hrrr.t06z.wrfsfcf03.grib2"
     assert url == expected
 
 def test_read_points_file(tmp_path):
@@ -87,12 +87,12 @@ def test_get_grib_variable_name():
 def test_get_variable_level_config():
     """Test getting variable level configurations."""
     # Variables with level configs
-    assert get_variable_level_config("u_component_wind_80m") == {"level": 80}
-    assert get_variable_level_config("v_component_wind_80m") == {"level": 80}
+    assert get_variable_level_config("u_component_wind_80m") == {"level": 80, "typeOfLevel": "heightAboveGround"}
+    assert get_variable_level_config("v_component_wind_80m") == {"level": 80, "typeOfLevel": "heightAboveGround"}
     
     # Variables without level configs
-    assert get_variable_level_config("temperature_2m") == {}
-    assert get_variable_level_config("surface_pressure") == {}
+    assert get_variable_level_config("temperature_2m") == {"level": 2, "typeOfLevel": "heightAboveGround"}
+    assert get_variable_level_config("surface_pressure") == {"level": 0, "typeOfLevel": "surface"}
 
 def test_validate_variables():
     """Test variable validation."""
@@ -121,17 +121,17 @@ def test_get_variable_levels_for_filtering():
     # Variables with level configs
     level_types, levels = get_variable_levels_for_filtering(["u_component_wind_80m", "v_component_wind_80m"])
     assert levels == [80]
-    assert level_types == []
+    assert level_types == ["heightAboveGround"]
     
-    # Variables without level configs
+    # Variables without level configs (now they have configs)
     level_types, levels = get_variable_levels_for_filtering(["temperature_2m", "surface_pressure"])
-    assert levels == []
-    assert level_types == []
+    assert sorted(levels) == [0, 2]
+    assert sorted(level_types) == ["heightAboveGround", "surface"]
     
     # Mixed variables
     level_types, levels = get_variable_levels_for_filtering(["temperature_2m", "u_component_wind_80m"])
-    assert levels == [80]
-    assert level_types == []
+    assert sorted(levels) == [2, 80]
+    assert level_types == ["heightAboveGround"]
 
 def test_get_last_available_date():
     """Test getting last available date."""

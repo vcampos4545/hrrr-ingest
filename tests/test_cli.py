@@ -219,21 +219,21 @@ class TestProcessForecastHour:
         cache_dir = "./cache"
         base_path = "s3://test"
         
-        # Call function
+                # Call function
         grib_path, parsed_data, source_s3 = process_forecast_hour(
-            run_date, forecast_hour, points, variables, cache_dir, base_path
+            run_date, forecast_hour, points, {"2 metre temperature": {}}, cache_dir, base_path
         )
-        
+    
         # Verify results
         assert grib_path == "/path/to/file.grib2"
         assert parsed_data == [{"variable_name": "temperature_2m"}]
         assert source_s3 == "s3://test/file.grib2"
-        
+    
         # Verify mocks were called correctly
         mock_download.assert_called_once_with(run_date, forecast_hour, cache_dir, base_path)
         mock_build_url.assert_called_once_with(run_date, forecast_hour, base_path)
         mock_parse_grib.assert_called_once_with(
-            "/path/to/file.grib2", variables, points, None, None
+            "/path/to/file.grib2", {"2 metre temperature": {}}, points
         )
     
     @patch('hrrr_ingest.cli.download_grib')
@@ -263,11 +263,11 @@ class TestProcessForecastHour:
         
         # Call function
         grib_path, parsed_data, source_s3 = process_forecast_hour(
-            run_date, forecast_hour, points, variables, cache_dir, base_path, level_types, levels
+            run_date, forecast_hour, points, {"2 metre temperature": {"level": 2, "typeOfLevel": "surface"}}, cache_dir, base_path
         )
         
         # Verify mocks were called with filters
         mock_parse_grib.assert_called_once_with(
-            "/path/to/file.grib2", variables, points, level_types, levels
+            "/path/to/file.grib2", {"2 metre temperature": {"level": 2, "typeOfLevel": "surface"}}, points
         )
 

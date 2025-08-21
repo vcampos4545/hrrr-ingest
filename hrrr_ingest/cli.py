@@ -5,14 +5,14 @@ CLI module for HRRR ingest tool.
 import argparse
 import sys
 import logging
-from typing import List
+from typing import List, Dict, Any
 from pathlib import Path
 
 from .downloader import download_grib
 from .parser import parse_grib_file
 from .transformer import transform_to_long_format, combine_forecast_data, validate_dataframe
 from .db import HrrrDatabase
-from .utils import read_points_file, build_s3_url, validate_variables, map_variables_to_grib_names, get_variable_levels_for_filtering, get_last_available_date, get_allowed_variables
+from .utils import read_points_file, build_s3_url, validate_variables, build_variable_configs, get_last_available_date, get_allowed_variables
 
 logger = logging.getLogger(__name__)
 
@@ -91,7 +91,7 @@ Examples:
     
     parser.add_argument(
         '--base-path',
-        default='s3://noaa-hrrr-bdp-pds/hrrr',
+        default='s3://noaa-hrrr-bdp-pds.s3.amazonaws.com/hrrr',
         help='Base S3 path for HRRR data'
     )
     
@@ -164,11 +164,9 @@ def process_forecast_hour(
     run_date: str,
     forecast_hour: int,
     points: List[tuple],
-    variables: List[str],
+    variable_configs: Dict[str, Dict[str, Any]],
     cache_dir: str,
-    base_path: str,
-    level_types: List[str] = None,
-    levels: List[int] = None
+    base_path: str
 ) -> tuple:
     """
     Process a single forecast hour.
@@ -177,11 +175,9 @@ def process_forecast_hour(
         run_date: Run date string
         forecast_hour: Forecast hour to process
         points: List of (lat, lon) tuples
-        variables: List of variable names
+        variable_configs: Dictionary mapping variable names to their level configurations
         cache_dir: Cache directory path
         base_path: Base S3 path
-        level_types: Optional level types filter
-        levels: Optional levels filter
         
     Returns:
         Tuple of (grib_file_path, parsed_data, source_s3)
@@ -195,13 +191,7 @@ def process_forecast_hour(
     source_s3 = build_s3_url(run_date, forecast_hour, base_path)
     
     # Parse GRIB file
-    parsed_data = parse_grib_file(
-        grib_file_path, 
-        variables, 
-        points, 
-        level_types, 
-        levels
-    )
+    parsed_data = parse_grib_file(grib_file_path, variable_configs, points)
     
     return grib_file_path, parsed_data, source_s3
 
@@ -232,25 +222,11 @@ def main():
         
         # Parse and map variables to grib names
         variables = [v.strip() for v in args.variables.split(',')]
-        grib_variables = map_variables_to_grib_names(variables)
         logger.info(f"Processing variables: {variables}")
-        logger.info(f"Mapped to grib names: {grib_variables}")
         
-        # Get level configurations for variables
-        var_level_types, var_levels = get_variable_levels_for_filtering(variables)
-        
-        # Parse optional filters (user-provided filters take precedence)
-        level_types = None
-        if args.level_types:
-            level_types = [lt.strip() for lt in args.level_types.split(',')]
-        elif var_level_types:
-            level_types = var_level_types
-        
-        levels = None
-        if args.levels:
-            levels = [int(l.strip()) for l in args.levels.split(',')]
-        elif var_levels:
-            levels = var_levels
+        # Build variable configurations
+        variable_configs = build_variable_configs(variables)
+        logger.info(f"Built configurations for {len(variable_configs)} variables")
         
         # Read points file
         points = read_points_file(args.points_file)
@@ -270,11 +246,9 @@ def main():
                         args.run_date,
                         hour,
                         points,
-                        grib_variables,
+                        variable_configs,
                         args.cache_dir,
-                        args.base_path,
-                        level_types,
-                        levels
+                        args.base_path
                     )
                     
                     if parsed_data:

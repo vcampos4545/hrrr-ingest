@@ -17,7 +17,7 @@ def download_grib(
     run_date: str, 
     forecast_hour: int, 
     cache_dir: str = "./cache",
-    base_path: str = "s3://noaa-hrrr-bdp-pds/hrrr"
+    base_path: str = "s3://noaa-hrrr-bdp-pds.s3.amazonaws.com/hrrr"
 ) -> str:
     """
     Download GRIB2 file from S3 with caching for idempotency.
@@ -45,9 +45,9 @@ def download_grib(
     cache_path = Path(cache_dir)
     cache_path.mkdir(parents=True, exist_ok=True)
     
-    # Generate local filename
+    # Generate local filename based on HTTPS URL structure
     run_time = run_date.replace("-", "")
-    local_filename = f"hrrr.{run_time}.f{forecast_hour:02d}.grib2"
+    local_filename = f"noaa-hrrr-bdp-pds.s3.amazonaws.com_hrrr.{run_time}_conus_hrrr.t06z.wrfsfcf{forecast_hour:02d}.grib2"
     local_path = cache_path / local_filename
     
     # Check if file already exists (idempotency)
@@ -58,9 +58,6 @@ def download_grib(
     # Convert S3 URL to HTTP URL for requests
     if s3_url.startswith("s3://"):
         http_url = s3_url.replace("s3://", "https://")
-        # Add .s3.amazonaws.com to the hostname
-        if "noaa-hrrr-bdp-pds" in http_url:
-            http_url = http_url.replace("noaa-hrrr-bdp-pds", "noaa-hrrr-bdp-pds.s3.amazonaws.com")
     else:
         http_url = s3_url
     
