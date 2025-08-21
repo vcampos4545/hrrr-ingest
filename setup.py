@@ -20,17 +20,16 @@ with open("requirements.txt", "r") as f:
 setup(
     name="hrrr-ingest",
     version="0.1.0",
-    author="HRRR Ingest Team",
-    author_email="team@hrrr-ingest.com",
+    author="Vaughn Campos",
+    author_email="vcampos4545@gmail.com",
     description="A CLI tool for downloading and processing HRRR forecast data",
     long_description=long_description,
     long_description_content_type="text/markdown",
-    url="https://github.com/your-org/hrrr-ingest",
+    url="https://github.com/vcampos4545/hrrr-ingest",
     packages=find_packages(),
     classifiers=[
         "Development Status :: 3 - Alpha",
         "Intended Audience :: Science/Research",
-        "License :: OSI Approved :: MIT License",
         "Operating System :: OS Independent",
         "Programming Language :: Python :: 3",
         "Programming Language :: Python :: 3.8",
@@ -51,9 +50,7 @@ setup(
     zip_safe=False,
     keywords="weather forecast hrrr grib meteorology climate",
     project_urls={
-        "Bug Reports": "https://github.com/your-org/hrrr-ingest/issues",
-        "Source": "https://github.com/your-org/hrrr-ingest",
-        "Documentation": "https://github.com/your-org/hrrr-ingest/blob/main/README.md",
+        "Source": "https://github.com/vcampos4545/hrrr-ingest"
     },
 )
 
