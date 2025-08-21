@@ -50,8 +50,7 @@ class TestParseArguments:
             '--db-path', 'forecast.db',
             '--cache-dir', './hrrr_cache',
             '--base-path', 's3://custom-bucket/hrrr',
-            '--level-types', 'surface,heightAboveGround',
-            '--levels', '2,80',
+
 
             '--verbose',
             '--dry-run'
@@ -65,8 +64,7 @@ class TestParseArguments:
             assert args.db_path == 'forecast.db'
             assert args.cache_dir == './hrrr_cache'
             assert args.base_path == 's3://custom-bucket/hrrr'
-            assert args.level_types == 'surface,heightAboveGround'
-            assert args.levels == '2,80'
+
 
             assert args.verbose is True
             assert args.dry_run is True

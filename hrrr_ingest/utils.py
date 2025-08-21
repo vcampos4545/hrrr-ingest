@@ -49,6 +49,36 @@ def get_allowed_variables() -> Set[str]:
     """
     return set(ALLOWED_VARIABLES.keys())
 
+def get_grib_variable_name(argument_name: str) -> str:
+    """
+    Get the actual grib variable name for a given argument name.
+    
+    Args:
+        argument_name: The variable name passed as an argument
+        
+    Returns:
+        The actual grib variable name
+        
+    Raises:
+        ValueError: If the argument name is not allowed
+    """
+    if argument_name not in ALLOWED_VARIABLES:
+        raise ValueError(f"Variable '{argument_name}' is not allowed. Allowed variables: {list(ALLOWED_VARIABLES.keys())}")
+    
+    return ALLOWED_VARIABLES[argument_name]
+
+def get_variable_level_config(argument_name: str) -> Dict[str, Any]:
+    """
+    Get the level configuration for a variable if it exists.
+    
+    Args:
+        argument_name: The variable name passed as an argument
+        
+    Returns:
+        Dictionary with level configuration or empty dict if no level config
+    """
+    return VARIABLE_LEVELS.get(argument_name, {})
+
 def validate_variables(variables: List[str]) -> None:
     """
     Validate that all provided variables are in the allowed list.

@@ -95,15 +95,7 @@ Examples:
         help='Base S3 path for HRRR data'
     )
     
-    parser.add_argument(
-        '--level-types',
-        help='Comma-separated list of level types to filter by'
-    )
-    
-    parser.add_argument(
-        '--levels',
-        help='Comma-separated list of levels to filter by'
-    )
+
     
 
     

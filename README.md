@@ -60,8 +60,7 @@ hrrr-ingest locations.csv \
   --run-date 2025-01-24 \
   --variables temperature_2m,surface_pressure,wind_speed_80m \
   --num-hours 6 \
-  --level-types surface,heightAboveGround \
-  --levels 2,80 \
+
   --db-path forecast.db \
   --cache-dir ./hrrr_cache \
 
@@ -84,17 +83,15 @@ Create a text file with one lat,lon coordinate pair per line:
 
 ### Command Line Options
 
-| Option          | Description                                      | Default                                      |
-| --------------- | ------------------------------------------------ | -------------------------------------------- |
-| `points_file`   | Path to file containing lat,lon coordinates      | Required                                     |
-| `--run-date`    | The forecast run date of the data to ingest      | Last available date                          |
-| `--variables`   | A comma separated list of variables to ingest    | All supported variables                      |
-| `--num-hours`   | Number of hours of forecast data to ingest       | 48                                           |
-| `--db-path`     | Path to DuckDB database file                     | data.db                                      |
-| `--cache-dir`   | Directory to cache downloaded files              | ./cache                                      |
-| `--base-path`   | Base S3 path for HRRR data                       | s3://noaa-hrrr-bdp-pds.s3.amazonaws.com/hrrr |
-| `--level-types` | Comma-separated list of level types to filter by | None                                         |
-| `--levels`      | Comma-separated list of levels to filter by      | None                                         |
+| Option        | Description                                   | Default                                      |
+| ------------- | --------------------------------------------- | -------------------------------------------- |
+| `points_file` | Path to file containing lat,lon coordinates   | Required                                     |
+| `--run-date`  | The forecast run date of the data to ingest   | Last available date                          |
+| `--variables` | A comma separated list of variables to ingest | All supported variables                      |
+| `--num-hours` | Number of hours of forecast data to ingest    | 48                                           |
+| `--db-path`   | Path to DuckDB database file                  | data.db                                      |
+| `--cache-dir` | Directory to cache downloaded files           | ./cache                                      |
+| `--base-path` | Base S3 path for HRRR data                    | s3://noaa-hrrr-bdp-pds.s3.amazonaws.com/hrrr |
 
 | `--verbose` | Enable verbose logging | False |
 | `--dry-run` | Download and parse data but do not insert into database | False |
@@ -131,7 +128,7 @@ The tool supports the following variables that can be passed as arguments:
 | `u_component_wind_80m`                | U component of wind                 | U-Component of wind at 80m above ground  |
 | `v_component_wind_80m`                | V component of wind                 | V-Component of wind at 80m above ground  |
 
-**Note:** Variables with specific levels (like 80m wind components) are automatically filtered to the correct level. You can override this by providing explicit `--level-types` and `--levels` arguments.
+**Note:** Variables with specific levels (like 80m wind components) are automatically filtered to the correct level.
 
 Use the `--verbose` flag to see all available variables in a GRIB file.
 
@@ -196,61 +193,3 @@ insert_forecast_data(df, 'forecast.db')
 ```bash
 pytest tests/ -v
 ```
-
-### Code Formatting
-
-```bash
-black hrrr_ingest/
-flake8 hrrr_ingest/
-```
-
-### Type Checking
-
-```bash
-mypy hrrr_ingest/
-```
-
-## Project Structure
-
-```
-hrrr_ingest/
-├── hrrr_ingest/
-│   ├── __init__.py          # Package initialization
-│   ├── cli.py               # Command-line interface
-│   ├── downloader.py        # GRIB file downloader
-│   ├── parser.py            # GRIB file parser
-│   ├── transformer.py       # Data transformation
-│   ├── db.py                # Database operations
-│   └── utils.py             # Shared utilities
-├── tests/                   # Test files
-├── requirements.txt         # Dependencies
-├── setup.py                 # Package setup
-└── README.md               # This file
-```
-
-## Contributing
-
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Add tests for new functionality
-5. Run the test suite
-6. Submit a pull request
-
-## License
-
-This project is licensed under the MIT License - see the LICENSE file for details.
-
-## Acknowledgments
-
-- NOAA for providing HRRR forecast data
-- The pygrib developers for GRIB file parsing capabilities
-- DuckDB team for the embedded analytical database
-
-## Support
-
-For issues and questions:
-
-1. Check the [documentation](https://github.com/your-org/hrrr-ingest/blob/main/README.md)
-2. Search [existing issues](https://github.com/your-org/hrrr-ingest/issues)
-3. Create a [new issue](https://github.com/your-org/hrrr-ingest/issues/new)
