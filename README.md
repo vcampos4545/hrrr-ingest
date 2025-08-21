@@ -170,7 +170,7 @@ print(df)
 
 ```python
 from hrrr_ingest import download_grib, parse_grib_file, transform_to_long_format
-from hrrr_ingest.db import insert_forecast_data
+from hrrr_ingest.db import insert_forecast_data, check_existing_data, get_duplicate_count
 
 # Download a GRIB file
 grib_path = download_grib('2025-01-24', 0)
@@ -182,8 +182,14 @@ parsed_data = parse_grib_file(grib_path, ['temperature_2m'], points)
 # Transform to long format
 df = transform_to_long_format(parsed_data, 's3://source/file.grib2')
 
-# Insert into database
-insert_forecast_data(df, 'forecast.db')
+# Check for existing data before insertion
+duplicate_count = get_duplicate_count(df, 'forecast.db')
+if duplicate_count > 0:
+    print(f"Found {duplicate_count} existing rows that would be duplicates")
+
+# Insert into database (duplicates are automatically ignored)
+rows_inserted = insert_forecast_data(df, 'forecast.db')
+print(f"Inserted {rows_inserted} new rows")
 ```
 
 ## Development

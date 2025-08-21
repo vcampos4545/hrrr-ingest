@@ -264,10 +264,19 @@ def main():
                 combined_df = combine_forecast_data(all_dataframes)
                 
                 if not args.dry_run:
+                    # Check for existing data before insertion
+                    duplicate_count = db.get_duplicate_count(combined_df)
+                    if duplicate_count > 0:
+                        logger.info(f"Found {duplicate_count} existing rows that would be duplicates")
+                    
                     # Insert into database
                     total_rows = db.insert_forecast_data(combined_df)
                     logger.info(f"Successfully processed {total_rows} total rows")
                 else:
+                    # In dry-run mode, check what would be duplicates
+                    duplicate_count = db.get_duplicate_count(combined_df)
+                    if duplicate_count > 0:
+                        logger.info(f"Dry run: Would skip {duplicate_count} duplicate rows")
                     logger.info(f"Dry run: Would insert {len(combined_df)} rows")
             else:
                 logger.warning("No data to process")

@@ -8,7 +8,7 @@ import tempfile
 from pathlib import Path
 from datetime import datetime
 
-from hrrr_ingest.db import HrrrDatabase, create_forecast_table, insert_forecast_data
+from hrrr_ingest.db import HrrrDatabase, create_forecast_table, insert_forecast_data, check_existing_data, get_duplicate_count
 
 
 class TestHrrrDatabase:
@@ -99,6 +99,72 @@ class TestHrrrDatabase:
         finally:
             db.close()
     
+    def test_duplicate_prevention(self, temp_db_path, sample_dataframe):
+        """Test that duplicate rows are prevented from being inserted."""
+        db = HrrrDatabase(temp_db_path)
+        try:
+            # Create table first
+            db.create_forecast_table()
+            
+            # Insert data first time
+            rows_inserted = db.insert_forecast_data(sample_dataframe)
+            assert rows_inserted == 2
+            
+            # Try to insert the same data again
+            rows_inserted_second = db.insert_forecast_data(sample_dataframe)
+            assert rows_inserted_second == 0  # Should insert 0 rows due to duplicates
+            
+            # Verify total count is still 2 (no duplicates added)
+            result = db.conn.execute("SELECT COUNT(*) FROM hrrr_forecasts")
+            count = result.fetchone()[0]
+            assert count == 2
+        finally:
+            db.close()
+    
+    def test_check_existing_data(self, temp_db_path, sample_dataframe):
+        """Test checking for existing data."""
+        db = HrrrDatabase(temp_db_path)
+        try:
+            # Create table first
+            db.create_forecast_table()
+            
+            # Insert data
+            db.insert_forecast_data(sample_dataframe)
+            
+            # Check existing data
+            existing_data = db.check_existing_data(sample_dataframe)
+            assert len(existing_data) == 2  # All rows should exist
+            
+            # Check with new data (should return empty DataFrame)
+            new_data = sample_dataframe.copy()
+            new_data.loc[0, 'variable'] = 'different_variable'  # Change variable (part of unique constraint)
+            existing_data = db.check_existing_data(new_data)
+            assert len(existing_data) == 1  # Only the unchanged row should exist
+        finally:
+            db.close()
+    
+    def test_get_duplicate_count(self, temp_db_path, sample_dataframe):
+        """Test getting duplicate count."""
+        db = HrrrDatabase(temp_db_path)
+        try:
+            # Create table first
+            db.create_forecast_table()
+            
+            # Insert data
+            db.insert_forecast_data(sample_dataframe)
+            
+            # Check duplicate count
+            duplicate_count = db.get_duplicate_count(sample_dataframe)
+            assert duplicate_count == 2  # All rows should be duplicates
+            
+            # Check with new data
+            new_data = sample_dataframe.copy()
+            new_data.loc[0, 'variable'] = 'different_variable'  # Change variable (part of unique constraint)
+            duplicate_count = db.get_duplicate_count(new_data)
+            assert duplicate_count == 1  # Only one row should be a duplicate
+        finally:
+            db.close()
+
 
     
 
@@ -158,4 +224,58 @@ class TestConvenienceFunctions:
             assert count == 1
         finally:
             db.close()
+    
+    def test_check_existing_data_function(self, temp_db_path):
+        """Test check_existing_data convenience function."""
+        # Create sample data
+        data = {
+            'valid_time_utc': [datetime(2025, 1, 24, 12, 0, 0)],
+            'run_time_utc': [datetime(2025, 1, 24, 0, 0, 0)],
+            'latitude': [40.7128],
+            'longitude': [-74.0060],
+            'variable': ['temperature_2m'],
+            'value': [15.5],
+            'source_s3': ['s3://test/file.grib2']
+        }
+        df = pd.DataFrame(data)
+        
+        # Insert data first
+        insert_forecast_data(df, temp_db_path)
+        
+        # Check existing data
+        existing_data = check_existing_data(df, temp_db_path)
+        assert len(existing_data) == 1
+        
+        # Check with new data
+        new_data = df.copy()
+        new_data.loc[0, 'variable'] = 'different_variable'  # Change variable (part of unique constraint)
+        existing_data = check_existing_data(new_data, temp_db_path)
+        assert len(existing_data) == 0
+    
+    def test_get_duplicate_count_function(self, temp_db_path):
+        """Test get_duplicate_count convenience function."""
+        # Create sample data
+        data = {
+            'valid_time_utc': [datetime(2025, 1, 24, 12, 0, 0)],
+            'run_time_utc': [datetime(2025, 1, 24, 0, 0, 0)],
+            'latitude': [40.7128],
+            'longitude': [-74.0060],
+            'variable': ['temperature_2m'],
+            'value': [15.5],
+            'source_s3': ['s3://test/file.grib2']
+        }
+        df = pd.DataFrame(data)
+        
+        # Insert data first
+        insert_forecast_data(df, temp_db_path)
+        
+        # Check duplicate count
+        duplicate_count = get_duplicate_count(df, temp_db_path)
+        assert duplicate_count == 1
+        
+        # Check with new data
+        new_data = df.copy()
+        new_data.loc[0, 'variable'] = 'different_variable'  # Change variable (part of unique constraint)
+        duplicate_count = get_duplicate_count(new_data, temp_db_path)
+        assert duplicate_count == 0
 
